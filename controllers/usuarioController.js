@@ -111,7 +111,10 @@ export const confirmar = async (req, res) => {
     usuario.confirmado = true;
     usuario.token = "";
     await usuario.save();
-    res.json({ msg: "Usuario confirmado correctamente" });
+    res.json({
+      msg: "Usuario confirmado correctamente",
+      confirmado: true
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ msg: "Error en el servidor" });
@@ -150,9 +153,15 @@ export const comprobarToken = async (req, res) => {
   const usuario = await Usuario.findOne({ token });
 
   if (usuario) {
-    res.json({ msg: "Token válido, el usuario existe" });
+    res.json({
+      msg: "Token válido, el usuario existe",
+      valido: true
+    });
   } else {
-    return res.status(403).json({ msg: "Token no válido" });
+    return res.status(403).json({
+      msg: "Token no válido",
+      valido: false
+    });
   }
 }
 
