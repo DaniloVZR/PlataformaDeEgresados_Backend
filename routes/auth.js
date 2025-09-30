@@ -1,5 +1,5 @@
 import express from 'express';
-import { autenticar, registrar, confirmar, comprobarToken, nuevaPassword, recuperarPassword, perfil } from '../controllers/usuarioController.js';
+import { autenticar, registrar, confirmar, comprobarToken, nuevaPassword, recuperarPassword, perfil, logout } from '../controllers/usuarioController.js';
 import { validarRegistro, validarLogin, validarEmail, validarNuevaPassword } from '../middleware/validadores.js';
 import checkAuth from '../middleware/checkAuth.js';
 import rateLimit from 'express-rate-limit';
@@ -34,5 +34,6 @@ router.post('/recuperar-password/:token', validarNuevaPassword, nuevaPassword);
 
 // Perfil
 router.get('/perfil', checkAuth, perfil);
+router.post('logout', logout);
 
 export default router;

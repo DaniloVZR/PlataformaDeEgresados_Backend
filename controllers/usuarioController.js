@@ -48,7 +48,7 @@ export const registrar = async (req, res) => {
       msg: "Error al procesar el registro"
     });
   }
-}
+};
 
 export const autenticar = async (req, res) => {
   try {
@@ -83,6 +83,13 @@ export const autenticar = async (req, res) => {
 
     const token = generarJWT(usuario);
 
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 días
+    })
+
     res.json({
       success: true,
       msg: "Login exitoso",
@@ -92,6 +99,7 @@ export const autenticar = async (req, res) => {
         nombre: usuario.nombre,
         correo: usuario.correo,
       },
+      token
     });
 
   } catch (error) {
@@ -101,7 +109,19 @@ export const autenticar = async (req, res) => {
       msg: "Error en el servidor"
     });
   }
-}
+};
+
+export const logout = (req, res) => {
+  res.cookie('token', '', {
+    httpOnly: true,
+    expires: new Date(0),
+  });
+
+  res.json({
+    success: true,
+    msg: "Sesión cerrada correctamente"
+  });
+};
 
 export const confirmar = async (req, res) => {
   try {
