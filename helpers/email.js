@@ -14,11 +14,13 @@ export const emailRegistro = async (datos) => {
       },
     });
 
+    const url = `${process.env.FRONTEND_URL}/confirmar-cuenta/${token}`;
+
     await transporter.sendMail({
       from: `"Plataforma de Egresados" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: asunto,
-      text: `Hola ${nombre},\n\nTu cuenta ya casi está lista, por favor confirma tu correo haciendo clic en el siguiente enlace: http://localhost:5000/api/usuario/confirmar/${token}\n\nSi no fuiste tú, puedes ignorar este mensaje.\n\nSaludos,\nEl equipo de la Plataforma de Egresados`,
+      text: `Hola ${nombre},\n\nTu cuenta ya casi está lista, por favor confirma tu correo haciendo clic en el siguiente enlace: ${url}\n\nSi no fuiste tú, puedes ignorar este mensaje.\n\nSaludos,\nEl equipo de la Plataforma de Egresados`,
       html: `
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9ff;">
     <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 0.5rem; box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); overflow: hidden;">
@@ -38,7 +40,7 @@ export const emailRegistro = async (datos) => {
 
             <!-- Button -->
             <div style="text-align: center; margin: 2rem 0;">
-                <a href="http://localhost:5000/api/usuario/confirmar/${token}" 
+                <a href="${url}" 
                    style="display: inline-block; padding: 15px 30px; 
                           font-size: 1.06rem; font-weight: 600; 
                           color: white; background-color: #4CAF50; 
@@ -76,15 +78,12 @@ export const emailRegistro = async (datos) => {
   `
     });
 
-    console.log('Correo de registro enviado a: ' + email);
   } catch (error) {
     console.log('Error al enviar el correo de registro: ', error);
   }
 }
 
 export const emailOlvidePassword = async ({ nombre, email, token }) => {
-
-  console.log(email);
 
   try {
     const transporter = nodemailer.createTransport({
