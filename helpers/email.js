@@ -47,17 +47,7 @@ export const emailRegistro = async (datos) => {
                           box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);">
                     Confirmar Cuenta
                 </a>
-            </div>
-
-            <p style="font-size: 0.95rem; color: #8c8c8c; line-height: 1.6; margin-bottom: 1.5rem;">
-                Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:
-            </p>
-            
-            <div style="background-color: #f9f9ff; border: 1px solid #d5cbff; 
-                       border-radius: 0.31rem; padding: 1rem; margin: 1.5rem 0;
-                       word-break: break-all;">
-                <p style="font-size: 0.87rem; color: #5f41e4; margin: 0;">http://localhost:5000/api/usuario/confirmar/${token}</p>
-            </div>
+            </div>            
 
             <div style="background-color: #e8f5e9; border: 1px solid #c8e6c9; 
                        border-radius: 0.31rem; padding: 1rem; margin: 1.5rem 0;">
