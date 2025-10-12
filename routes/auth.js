@@ -2,7 +2,6 @@ import express from 'express';
 import { autenticar, registrar, confirmar, comprobarToken, nuevaPassword, recuperarPassword, perfil, logout } from '../controllers/usuarioController.js';
 import { validarRegistro, validarLogin, validarEmail, validarNuevaPassword } from '../middleware/validadores.js';
 import checkAuth from '../middleware/checkAuth.js';
-import rateLimit from 'express-rate-limit';
 const router = express.Router();
 
 // Limitadores de tasa para proteger contra ataques de fuerza bruta
