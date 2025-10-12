@@ -161,10 +161,10 @@ export const recuperarPassword = async (req, res) => {
 
     const usuario = await Usuario.findOne({ correo });
 
-    if (!usuario) {
+    if (!usuario || !usuario.confirmado) {
       return res.json({
-        success: true,
-        msg: "Revisa el correo con el que se registró, recibirás instrucciones para recuperar tu contraseña"
+        success: false,
+        msg: "No se encontró un usuario con ese correo o no está confirmado"
       });
     }
 

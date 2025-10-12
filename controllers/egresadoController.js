@@ -1,0 +1,196 @@
+import Egresado from "../models/Egresado.js";
+import { v2 as cloudinary } from 'cloudinary';
+
+export const obtenerEgresado = async (req, res) => {
+  try {
+
+    const { usuario } = req;
+
+    const egresado = await Egresado.findOne({ usuario: usuario._id }).populate('usuario', 'email');
+
+    if (!egresado) {
+      return res.status(404).json({
+        success: false,
+        msg: "Egresado no encontrado"
+      });
+    }
+
+    res.json({
+      success: true,
+      egresado
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      msg: "Error en el servidor"
+    });
+  }
+}
+
+export const crearEgresado = async (req, res) => {
+  try {
+    const usuarioId = req.usuario._id;
+
+    // Verificar si ya existe un perfil para este usuario
+    const existeEgresado = await Egresado.findOne({ usuario: usuarioId });
+
+    if (existeEgresado) {
+      return res.status(400).json({
+        success: false,
+        msg: "Perfil ya existente"
+      });
+    }
+
+    const { nombre, apellido, programaAcademico, yearGraduacion, descripcion, redes } = req.body;
+
+    if (!nombre || !apellido || !programaAcademico || !yearGraduacion) {
+      return res.status(400).json({ msg: "Todos los campos obligatorios deben ser completados" });
+    }
+
+    const nuevoEgresado = new Egresado({
+      usuario: usuarioId,
+      nombre,
+      apellido,
+      email: req.usuario.correo,
+      programaAcademico,
+      yearGraduacion,
+      descripcion: "",
+      redesSociales: {},
+      fotoPerfil: "",
+      completadoPerfil: true
+    });
+
+    const egresadoGuardado = await nuevoEgresado.save();
+
+    res.status(201).json({
+      success: true,
+      msg: "Perfil creado correctamente",
+      egresado: egresadoGuardado
+    });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      success: false,
+      msg: "Error en el servidor"
+    });
+  }
+}
+
+export const actualizarEgresado = async (req, res) => {
+  try {
+    const { usuario } = req;
+    const egresado = await Egresado.findOne({ usuario: usuario._id });
+
+    if (!egresado) {
+      return res.status(404).json({
+        success: false,
+        msg: "Egresado no encontrado"
+      });
+    }
+
+    const camposActualizables = [
+      "descripcion",
+      "programaAcademico",
+      "yearGraduacion",
+      "redesSociales",
+    ];
+
+    // Seguridad: evitar actualización de email y password
+    if (req.body.correo || req.body.password) {
+      return res.status(400).json({
+        success: false,
+        msg: "Acción imposible: no se puede actualizar email o password"
+      });
+    }
+
+    // Validación
+    for (let campo of camposActualizables) {
+      if (req.body[campo] !== undefined && req.body[campo] === "") {
+        return res.status(400).json({
+          success: false,
+          msg: `El campo '${campo}' no puede estar vacío`
+        });
+      }
+    }
+
+    if (req.body.fotoPerfil && typeof req.body.fotoPerfil !== "string") {
+      return res.status(400).json({
+        success: false,
+        msg: "El campo de Foto de Perfil debe ser un string"
+      });
+    }
+
+    camposActualizables.forEach((campo => {
+      if (req.body[campo] !== undefined) {
+        egresado[campo] = req.body[campo];
+      }
+    }))
+
+    egresado.actualizadoEn = Date.now();
+    const actualizado = await egresado.save();
+
+    res.json({
+      success: true,
+      msg: "Información actualizada correctamente",
+      egresado: actualizado
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      msg: "Error en el servidor"
+    });
+  }
+}
+
+export const actualizarFotoPerfil = async (req, res) => {
+
+  try {
+    const { usuario } = req;
+    const egresado = await Egresado.findOne({ usuario: usuario._id });
+
+    if (!egresado) {
+      return res.status(404).json({
+        success: false,
+        msg: "Egresado no encontrado"
+      });
+    }
+
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        msg: "No se envió ninguna imagen"
+      });
+    }
+
+    // Verificar si hay foto
+    if (egresado.fotoPerfil) {
+      try {
+        // Eliminar foto anterior en Cloudinary
+        const publicId = egresado.fotoPerfil.split('/').pop().split('.')[0];
+        await cloudinary.uploader.destroy(`egresados_fotos_perfil/${publicId}`);
+
+      } catch (error) {
+        console.warn("No se pudo eliminar la imagen anterior:", err.message);
+      }
+    }
+
+    egresado.fotoPerfil = req.file.path;
+    await egresado.save();
+
+    res.json({
+      success: true,
+      msg: "Foto de perfil actualizada correctamente",
+      fotoPerfil: egresado.fotoPerfil
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      msg: "Error al actualizar la foto de perfil"
+    });
+  }
+}

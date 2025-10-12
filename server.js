@@ -2,7 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import conectarDB from './config/db.js';
 import authRoutes from './routes/auth.js';
-import mongoSanitize from 'express-mongo-sanitize';
+import egresadoRoutes from './routes/egresado.routes.js';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
@@ -31,6 +31,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/usuario', authRoutes);
+app.use('/api/egresado', egresadoRoutes);
 
 const PORT = process.env.PORT || 5000;
 
