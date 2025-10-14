@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import Egresado from "./Egresado.js";
 
 const usuarioSchema = mongoose.Schema({
   nombre: {
@@ -47,6 +48,15 @@ usuarioSchema.pre("save", async function (next) {
 usuarioSchema.methods.compararPassword = async function (passwordFormulario) {
   return await bcrypt.compare(passwordFormulario, this.password);
 }
+
+// Eliminar el perfil de egresado cuando se elimina un usuario
+usuarioSchema.pre('findOneAndDelete', async function (next) {
+  const user = await this.model.findOne(this.getQuery());
+  if (user) {
+    await Egresado.deleteOne({ usuario: user._id });
+  }
+  next();
+});
 
 const Usuario = mongoose.model("Usuario", usuarioSchema);
 
