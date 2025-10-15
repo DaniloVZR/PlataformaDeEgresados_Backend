@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import conectarDB from './config/db.js';
 import authRoutes from './routes/auth.js';
 import egresadoRoutes from './routes/egresado.routes.js';
+import publicacionRoutes from './routes/publicacion.route.js';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
@@ -32,6 +33,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/usuario', authRoutes);
 app.use('/api/egresado', egresadoRoutes);
+app.use('/api/publicacion', publicacionRoutes);
 
 const PORT = process.env.PORT || 5000;
 
