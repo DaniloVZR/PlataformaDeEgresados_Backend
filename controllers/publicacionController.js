@@ -1,3 +1,4 @@
+import Egresado from "../models/Egresado.js";
 import Publicacion from "../models/Publicacion.js";
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -128,6 +129,48 @@ export const eliminarPublicacion = async (req, res) => {
   }
 }
 
+export const obtenerPublicacionesPorEgresado = async (req, res) => {
+  try {
+    const { egresadoId } = req.params;
+
+    const { page = 1, limit = 10 } = req.query;
+
+    // Verificar que existe
+    const egresado = await Egresado.findById(egresadoId);
+
+    if (!egresado) {
+      return res.status(404).json({
+        success: false,
+        msg: "Egresado no encontrado"
+      })
+    }
+
+    const publicaciones = await Publicacion.find({ autor: egresadoId })
+      .populate('autor', 'nombre apellido')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean()
+
+    const total = await Publicacion.countDocuments({ autor: egresadoId })
+
+    res.json({
+      success: true,
+      publicaciones,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      total
+    });
+
+  } catch {
+    res.status(500).json({
+      success: false,
+      msg: "Error al obtener las publicaciones",
+      error: error.message
+    });
+  }
+}
+
 export const obtenerPublicacion = async (req, res) => {
   try {
     const publicacion = await Publicacion.findById(req.params.id)
@@ -226,6 +269,45 @@ export const editarPublicacion = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error al editar la publicación",
+      error: error.message
+    });
+  }
+}
+
+export const toggleLike = async (req, res) => {
+  try {
+    const publicacion = await Publicacion.findById(req.params.id)
+
+    if (!publicacion) {
+      return res.status(404).json({
+        success: false,
+        msg: "Publicación no encontrada"
+      });
+    }
+
+    const tieneLike = publicacion.likes.includes(req.egresado._id);
+
+    if (tieneLike) {
+      publicacion.likes = publicacion.likes.filter(
+        id => id.toString() !== req.egresado._id.toString()
+      );
+    } else {
+      publicacion.likes.push(req.egresado._id);
+    }
+
+    await publicacion.save();
+
+    res.json({
+      success: true,
+      msg: tieneLike ? "Like eliminado" : "Like agregado",
+      likes: publicacion.likes.length,
+      liked: !tieneLike
+    });
+
+  } catch {
+    res.status(500).json({
+      success: false,
+      message: "Error al procesar el like",
       error: error.message
     });
   }

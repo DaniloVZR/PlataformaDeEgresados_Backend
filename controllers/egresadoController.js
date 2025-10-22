@@ -4,9 +4,7 @@ import { v2 as cloudinary } from 'cloudinary';
 export const obtenerEgresado = async (req, res) => {
   try {
 
-    const { usuario } = req;
-
-    const egresado = await Egresado.findOne({ usuario: usuario._id }).populate('usuario', 'email');
+    const egresado = await Egresado.findOne({ usuario: req.usuario._id }).populate('usuario', 'nombre correo');
 
     if (!egresado) {
       return res.status(404).json({
@@ -28,6 +26,66 @@ export const obtenerEgresado = async (req, res) => {
   }
 }
 
+export const completarPerfil = async (req, res) => {
+  try {
+    const usuarioId = req.usuario._id;
+
+    // Buscar perfil
+
+    const egresado = await Egresado.findOne({ usuario: usuarioId });
+
+    if (!egresado) {
+      return res.status(404).json({
+        success: false,
+        msg: "Perfil no encontrado"
+      });
+    }
+
+    const {
+      nombre,
+      apellido,
+      programaAcademico,
+      yearGraduacion,
+      descripcion,
+      redesSociales
+    } = req.body;
+
+    // Actualizar campos
+    if (nombre) egresado.nombre = nombre;
+    if (apellido) egresado.apellido = apellido;
+    if (programaAcademico) egresado.programaAcademico = programaAcademico;
+    if (yearGraduacion) egresado.yearGraduacion = yearGraduacion;
+    if (descripcion !== undefined) egresado.descripcion = descripcion;
+    if (redesSociales) {
+      egresado.redesSociales = {
+        ...egresado.redesSociales,
+        ...redesSociales
+      };
+    }
+
+    // Verificar si el perfil está completo
+    if (egresado.nombre && egresado.programaAcademico && egresado.yearGraduacion) {
+      egresado.completadoPerfil = true;
+    }
+
+    egresado.actualizadoEn = Date.now();
+    await egresado.save();
+
+    res.json({
+      success: true,
+      msg: egresado.completadoPerfil
+        ? "Perfil completado exitosamente"
+        : "Perfil actualizado",
+      egresado
+    });
+  } catch {
+    res.status(500).json({
+      success: false,
+      msg: "Error en el servidor"
+    });
+  }
+}
+/*
 export const crearEgresado = async (req, res) => {
   try {
     const usuarioId = req.usuario._id;
@@ -80,8 +138,7 @@ export const crearEgresado = async (req, res) => {
 
 export const actualizarEgresado = async (req, res) => {
   try {
-    const { usuario } = req;
-    const egresado = await Egresado.findOne({ usuario: usuario._id });
+    const egresado = await Egresado.findOne({ usuario: req.usuario._id });
 
     if (!egresado) {
       return res.status(404).json({
@@ -144,12 +201,10 @@ export const actualizarEgresado = async (req, res) => {
     });
   }
 }
-
+*/
 export const actualizarFotoPerfil = async (req, res) => {
-
   try {
-    const { usuario } = req;
-    const egresado = await Egresado.findOne({ usuario: usuario._id });
+    const egresado = await Egresado.findOne({ usuario: req.usuario._id });
 
     if (!egresado) {
       return res.status(404).json({
@@ -157,7 +212,6 @@ export const actualizarFotoPerfil = async (req, res) => {
         msg: "Egresado no encontrado"
       });
     }
-
 
     if (!req.file) {
       return res.status(400).json({
@@ -174,12 +228,23 @@ export const actualizarFotoPerfil = async (req, res) => {
         await cloudinary.uploader.destroy(`egresados_fotos_perfil/${publicId}`);
 
       } catch (error) {
-        console.warn("No se pudo eliminar la imagen anterior:", err.message);
+        console.log("No se pudo eliminar la imagen anterior:", err.message);
       }
     }
 
-    egresado.fotoPerfil = req.file.path;
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'egresados_fotos_perfil',
+      transformation: [
+        { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+        { quality: 'auto' }
+      ]
+    });
+
+    egresado.fotoPerfil = result.secure.url;
+    egresado.actualizadoEn = Date.now();
     await egresado.save();
+
+    fs.unlinkSync(req.file.path);
 
     res.json({
       success: true,

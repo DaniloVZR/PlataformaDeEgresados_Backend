@@ -1,4 +1,5 @@
 import Usuario from "../models/Usuario.js";
+import Egresado from "../models/Egresado.js";
 import { generarJWT, generarId } from "../helpers/index.js";
 import { emailRegistro, emailOlvidePassword } from "../helpers/email.js";
 
@@ -81,6 +82,20 @@ export const autenticar = async (req, res) => {
       });
     }
 
+    // Buscar perfil
+    const egresado = await Egresado.findOne({ usuario: usuario._id });
+
+    // Crear perfil en caso de que no exista crear
+    if (!egresado) {
+      const nuevoEgresado = new Egresado({
+        usuario: usuario._id,
+        nombre: usuario.nombre,
+        email: usuario.correo,
+        completadoPerfil: false
+      });
+      await nuevoEgresado.save();
+    }
+
     const token = generarJWT(usuario);
 
     res.cookie('token', token, {
@@ -99,7 +114,10 @@ export const autenticar = async (req, res) => {
         nombre: usuario.nombre,
         correo: usuario.correo,
       },
-      token
+      perfil: {
+        completado: egresado ? egresado.completadoPerfil : false,
+        id: egresado ? egresado._id : null
+      }
     });
 
   } catch (error) {
@@ -139,6 +157,15 @@ export const confirmar = async (req, res) => {
     usuario.confirmado = true;
     usuario.token = "";
     await usuario.save();
+
+    const nuevoEgresado = new Egresado({
+      usuario: usuario._id,
+      nombre: usuario.nombre,
+      email: usuario.correo,
+      completadoPerfil: false // Inicialmente no está completo
+    });
+
+    await nuevoEgresado.save();
 
     res.json({
       success: true,
