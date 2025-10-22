@@ -4,21 +4,6 @@ import { validarRegistro, validarLogin, validarEmail, validarNuevaPassword } fro
 import checkAuth from '../middleware/checkAuth.js';
 const router = express.Router();
 
-// Limitadores de tasa para proteger contra ataques de fuerza bruta
-
-// const loginLimiter = rateLimit({
-//   windowMs: 15 * 60 * 1000, // 15 minutos
-//   max: 5, // Solo 5 intentos
-//   message: 'Demasiados intentos de login. Intenta en 15 minutos',
-//   skipSuccessfulRequests: true, // No cuenta los login exitosos
-// });
-
-// const passwordRecoveryLimiter = rateLimit({
-//   windowMs: 60 * 60 * 1000, // 1 hora
-//   max: 3, // Solo 3 intentos de recuperación
-//   message: 'Demasiadas solicitudes de recuperación. Intenta en 1 hora',
-// });
-
 // login y registro
 router.post('/registrar', validarRegistro, registrar);
 router.post('/autenticar', validarLogin, autenticar);
@@ -36,3 +21,18 @@ router.get('/perfil', checkAuth, perfil);
 router.post('logout', logout);
 
 export default router;
+
+// Limitadores de tasa para proteger contra ataques de fuerza bruta
+
+// const loginLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutos
+//   max: 5, // Solo 5 intentos
+//   message: 'Demasiados intentos de login. Intenta en 15 minutos',
+//   skipSuccessfulRequests: true, // No cuenta los login exitosos
+// });
+
+// const passwordRecoveryLimiter = rateLimit({
+//   windowMs: 60 * 60 * 1000, // 1 hora
+//   max: 3, // Solo 3 intentos de recuperación
+//   message: 'Demasiadas solicitudes de recuperación. Intenta en 1 hora',
+// });

@@ -20,6 +20,20 @@ const checkEgresado = async (req, res, next) => {
       });
     }
 
+    // Si no existe, crearlo automáticamente
+    if (!egresado) {
+      const nuevoEgresado = new Egresado({
+        usuario: req.usuario._id,
+        nombre: req.usuario.nombre,
+        email: req.usuario.correo,
+        completadoPerfil: false
+      });
+      await nuevoEgresado.save();
+      req.egresado = nuevoEgresado;
+    } else {
+      req.egresado = egresado;
+    }
+
     // Opcional: verificar que el perfil esté completo
     if (!egresado.completadoPerfil) {
       return res.status(403).json({
@@ -28,7 +42,6 @@ const checkEgresado = async (req, res, next) => {
       });
     }
 
-    req.egresado = egresado;
     next();
 
   } catch (error) {

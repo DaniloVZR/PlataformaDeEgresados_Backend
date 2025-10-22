@@ -30,7 +30,7 @@ const checkAuth = async (req, res, next) => {
       });
     }
 
-    // 6. Opcional: Verificar si la cuenta está confirmada
+    // 6. Verificar si la cuenta está confirmada
     if (!usuario.confirmado) {
       return res.status(403).json({
         success: false,

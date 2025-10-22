@@ -9,12 +9,12 @@ const egresadoSchema = mongoose.Schema({
   },
   nombre: {
     type: String,
-    required: true,
+    default: "",
     trim: true
   },
   apellido: {
     type: String,
-    required: true,
+    default: "",
     trim: true
   },
   email: {
@@ -36,11 +36,11 @@ const egresadoSchema = mongoose.Schema({
   },
   programaAcademico: {
     type: String,
-    required: true,
+    default: ""
   },
   yearGraduacion: {
     type: Number,
-    required: true,
+    required: null,
   },
   redesSociales: {
     linkedin: { type: String, default: "" },
@@ -60,7 +60,7 @@ const egresadoSchema = mongoose.Schema({
     type: Date,
     default: Date.now
   }
-});
+}, { timestamps: true });
 
 const Egresado = mongoose.model("Egresado", egresadoSchema);
 
