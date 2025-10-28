@@ -14,9 +14,20 @@ const app = express();
 
 app.use(cookieParser());
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173'
+];
+
 // Actualiza CORS para permitir credentials
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200
 };
