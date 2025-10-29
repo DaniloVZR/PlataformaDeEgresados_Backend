@@ -4,6 +4,7 @@ import conectarDB from './config/db.js';
 import authRoutes from './routes/auth.js';
 import egresadoRoutes from './routes/egresado.routes.js';
 import publicacionRoutes from './routes/publicacion.route.js';
+import administradorRoutes from './routes/administrador.routes.js';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
@@ -45,11 +46,10 @@ app.get('/', (req, res) => {
 app.use('/api/usuario', authRoutes);
 app.use('/api/egresado', egresadoRoutes);
 app.use('/api/publicacion', publicacionRoutes);
+app.use('/api/admin', administradorRoutes);
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-// Comentario para testear squash merge

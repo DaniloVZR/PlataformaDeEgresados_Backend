@@ -38,7 +38,15 @@ const checkAuth = async (req, res, next) => {
       });
     }
 
-    // 7. Agregar el usuario al request
+    // 7. Verificar si la cuenta está activa (no baneada)
+    if (!usuario.activo) {
+      return res.status(403).json({
+        success: false,
+        msg: "Tu cuenta ha sido suspendida. Contacta al administrador para más información"
+      });
+    }
+
+    // 8. Agregar el usuario al request
     req.usuario = usuario;
 
     next();

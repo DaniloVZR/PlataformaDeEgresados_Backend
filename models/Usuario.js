@@ -32,6 +32,15 @@ const usuarioSchema = mongoose.Schema({
   confirmado: {
     type: Boolean,
     default: false
+  },
+  rol: {
+    type: String,
+    enum: ['comun', 'administrador'],
+    default: 'comun'
+  },
+  activo: {
+    type: Boolean,
+    default: true
   }
 }, { timestamps: true });
 
