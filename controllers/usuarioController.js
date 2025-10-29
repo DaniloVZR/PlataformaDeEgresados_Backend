@@ -5,7 +5,6 @@ import { emailRegistro, emailOlvidePassword } from "../helpers/email.js";
 
 export const registrar = async (req, res) => {
   try {
-    // Extracción de campos
     const { nombre, correo, password } = req.body;
 
     // Revisar si existe
@@ -23,7 +22,8 @@ export const registrar = async (req, res) => {
       nombre,
       correo,
       password,
-      token: generarId()
+      token: generarId(),
+      rol: 'comun'
     });
 
     await nuevoUsuario.save();
@@ -72,6 +72,13 @@ export const autenticar = async (req, res) => {
       });
     }
 
+    if (!usuario.activo) {
+      return res.status(403).json({
+        success: false,
+        msg: "Tu cuenta ha sido suspendida. Contacta al administrador para más información"
+      });
+    }
+
     // Comparar contraseñas
     const passwordValida = await usuario.compararPassword(password);
 
@@ -113,6 +120,7 @@ export const autenticar = async (req, res) => {
         id: usuario._id,
         nombre: usuario.nombre,
         correo: usuario.correo,
+        rol: usuario.rol
       },
       perfil: {
         completado: egresado ? egresado.completadoPerfil : false,
@@ -281,6 +289,13 @@ export const perfil = (req, res) => {
   const { usuario } = req;
   res.json({
     success: true,
-    usuario
+    usuario: {
+      id: usuario._id,
+      nombre: usuario.nombre,
+      correo: usuario.correo,
+      rol: usuario.rol,
+      activo: usuario.activo,
+      confirmado: usuario.confirmado
+    }
   });
 } 
