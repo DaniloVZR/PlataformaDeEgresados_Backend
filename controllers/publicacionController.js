@@ -285,14 +285,17 @@ export const toggleLike = async (req, res) => {
       });
     }
 
-    const tieneLike = publicacion.likes.includes(req.egresado._id);
+    const userId = req.egresado._id; // ID del usuario actual
+    const tieneLike = publicacion.likes.includes(userId);
 
     if (tieneLike) {
+      // Quitar like
       publicacion.likes = publicacion.likes.filter(
-        id => id.toString() !== req.egresado._id.toString()
+        id => id.toString() !== userId.toString()
       );
     } else {
-      publicacion.likes.push(req.egresado._id);
+      // Agregar like
+      publicacion.likes.push(userId);
     }
 
     await publicacion.save();
@@ -301,10 +304,11 @@ export const toggleLike = async (req, res) => {
       success: true,
       msg: tieneLike ? "Like eliminado" : "Like agregado",
       likes: publicacion.likes.length,
-      liked: !tieneLike
+      liked: !tieneLike,
+      userId: userId.toString()
     });
 
-  } catch {
+  } catch (error) {
     res.status(500).json({
       success: false,
       message: "Error al procesar el like",

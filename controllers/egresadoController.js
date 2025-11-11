@@ -224,11 +224,14 @@ export const actualizarFotoPerfil = async (req, res) => {
     if (egresado.fotoPerfil) {
       try {
         // Eliminar foto anterior en Cloudinary
-        const publicId = egresado.fotoPerfil.split('/').pop().split('.')[0];
-        await cloudinary.uploader.destroy(`egresados_fotos_perfil/${publicId}`);
+        const urlParts = egresado.fotoPerfil.split('/');
+        const filename = urlParts[urlParts.length - 1];
+        const publicId = `egresados_fotos_perfil/${filename.split('.')[0]}`;
 
+        await cloudinary.uploader.destroy(publicId);
+        console.log("✅ Imagen anterior eliminada");
       } catch (error) {
-        console.log("No se pudo eliminar la imagen anterior:", err.message);
+        console.log("⚠️ No se pudo eliminar la imagen anterior:", error.message);
       }
     }
 
@@ -240,11 +243,20 @@ export const actualizarFotoPerfil = async (req, res) => {
       ]
     });
 
-    egresado.fotoPerfil = result.secure.url;
+    console.log("Imagen subida a Cloudinary:", result.secure_url);
+
+    egresado.fotoPerfil = result.secure_url;
     egresado.actualizadoEn = Date.now();
     await egresado.save();
 
-    fs.unlinkSync(req.file.path);
+    if (req.file.path) {
+      try {
+        const fs = await import('fs');
+        fs.unlinkSync(req.file.path);
+      } catch (err) {
+        console.log("⚠️ No se pudo eliminar archivo temporal");
+      }
+    }
 
     res.json({
       success: true,
