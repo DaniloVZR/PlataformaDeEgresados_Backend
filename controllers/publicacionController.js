@@ -312,3 +312,38 @@ export const toggleLike = async (req, res) => {
     });
   }
 }
+
+export const obtenerPublicacionesLikeadas = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const publicaciones = await Publicacion.find({
+      likes: req.egresado._id
+    })
+      .populate('autor', 'nombre apellido fotoPerfil programaAcademico yearGraduacion')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    const total = await Publicacion.countDocuments({
+      likes: req.egresado._id
+    });
+
+    res.json({
+      success: true,
+      publicaciones,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Number(page),
+      total
+    });
+
+  } catch (error) {
+    console.error('Error al obtener publicaciones likeadas:', error);
+    res.status(500).json({
+      success: false,
+      msg: "Error al obtener las publicaciones que te gustan",
+      error: error.message
+    });
+  }
+}
