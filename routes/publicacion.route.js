@@ -6,7 +6,8 @@ import {
   editarPublicacion,
   eliminarPublicacion,
   obtenerPublicacionesPorEgresado,
-  toggleLike
+  toggleLike,
+  obtenerPublicacionesLikeadas
 } from "../controllers/publicacionController.js";
 import checkAuth from "../middleware/checkAuth.js";
 import checkEgresado from "../middleware/checkEgresado.js";
@@ -20,6 +21,9 @@ router.post("/", checkEgresado, upload.single("imagen"), crearPublicacion);
 
 // Obtener todas las publicaciones (feed)
 router.get("/", obtenerPublicaciones);
+
+// Obtener publicaciones likeadas
+router.get("/likeados", checkEgresado, obtenerPublicacionesLikeadas);
 
 // Obtener publicación por ID
 router.get("/:id", checkEgresado, obtenerPublicacion);
