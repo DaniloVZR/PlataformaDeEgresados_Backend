@@ -61,6 +61,7 @@ export const obtenerPublicaciones = async (req, res) => {
 
     const publicaciones = await Publicacion.find()
       .populate('autor', 'nombre apellido fotoPerfil programaAcademico yearGraduacion')
+      .populate('likes', 'nombre apellido fotoPerfil')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
@@ -147,6 +148,7 @@ export const obtenerPublicacionesPorEgresado = async (req, res) => {
 
     const publicaciones = await Publicacion.find({ autor: egresadoId })
       .populate('autor', 'nombre apellido')
+      .populate('likes', 'nombre apellido fotoPerfil')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
@@ -299,13 +301,15 @@ export const toggleLike = async (req, res) => {
     }
 
     await publicacion.save();
+    await publicacion.populate('likes', 'nombre apellido fotoPerfil');
 
     res.json({
       success: true,
       msg: tieneLike ? "Like eliminado" : "Like agregado",
       likes: publicacion.likes.length,
       liked: !tieneLike,
-      userId: userId.toString()
+      userId: userId.toString(),
+      likesData: publicacion.likes
     });
 
   } catch (error) {
@@ -325,6 +329,7 @@ export const obtenerPublicacionesLikeadas = async (req, res) => {
       likes: req.egresado._id
     })
       .populate('autor', 'nombre apellido fotoPerfil programaAcademico yearGraduacion')
+      .populate('likes', 'nombre apellido fotoPerfil')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
