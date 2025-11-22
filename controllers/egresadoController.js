@@ -3,7 +3,6 @@ import { v2 as cloudinary } from 'cloudinary';
 
 export const obtenerEgresado = async (req, res) => {
   try {
-
     const egresado = await Egresado.findOne({ usuario: req.usuario._id }).populate('usuario', 'nombre correo');
 
     if (!egresado) {
@@ -31,7 +30,6 @@ export const completarPerfil = async (req, res) => {
     const usuarioId = req.usuario._id;
 
     // Buscar perfil
-
     const egresado = await Egresado.findOne({ usuario: usuarioId });
 
     if (!egresado) {
@@ -85,123 +83,7 @@ export const completarPerfil = async (req, res) => {
     });
   }
 }
-/*
-export const crearEgresado = async (req, res) => {
-  try {
-    const usuarioId = req.usuario._id;
 
-    // Verificar si ya existe un perfil para este usuario
-    const existeEgresado = await Egresado.findOne({ usuario: usuarioId });
-
-    if (existeEgresado) {
-      return res.status(400).json({
-        success: false,
-        msg: "Perfil ya existente"
-      });
-    }
-
-    const { nombre, apellido, programaAcademico, yearGraduacion, descripcion, redes } = req.body;
-
-    if (!nombre || !apellido || !programaAcademico || !yearGraduacion) {
-      return res.status(400).json({ msg: "Todos los campos obligatorios deben ser completados" });
-    }
-
-    const nuevoEgresado = new Egresado({
-      usuario: usuarioId,
-      nombre,
-      apellido,
-      email: req.usuario.correo,
-      programaAcademico,
-      yearGraduacion,
-      descripcion: "",
-      redesSociales: {},
-      fotoPerfil: "",
-      completadoPerfil: true
-    });
-
-    const egresadoGuardado = await nuevoEgresado.save();
-
-    res.status(201).json({
-      success: true,
-      msg: "Perfil creado correctamente",
-      egresado: egresadoGuardado
-    });
-
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({
-      success: false,
-      msg: "Error en el servidor"
-    });
-  }
-}
-
-export const actualizarEgresado = async (req, res) => {
-  try {
-    const egresado = await Egresado.findOne({ usuario: req.usuario._id });
-
-    if (!egresado) {
-      return res.status(404).json({
-        success: false,
-        msg: "Egresado no encontrado"
-      });
-    }
-
-    const camposActualizables = [
-      "descripcion",
-      "programaAcademico",
-      "yearGraduacion",
-      "redesSociales",
-    ];
-
-    // Seguridad: evitar actualización de email y password
-    if (req.body.correo || req.body.password) {
-      return res.status(400).json({
-        success: false,
-        msg: "Acción imposible: no se puede actualizar email o password"
-      });
-    }
-
-    // Validación
-    for (let campo of camposActualizables) {
-      if (req.body[campo] !== undefined && req.body[campo] === "") {
-        return res.status(400).json({
-          success: false,
-          msg: `El campo '${campo}' no puede estar vacío`
-        });
-      }
-    }
-
-    if (req.body.fotoPerfil && typeof req.body.fotoPerfil !== "string") {
-      return res.status(400).json({
-        success: false,
-        msg: "El campo de Foto de Perfil debe ser un string"
-      });
-    }
-
-    camposActualizables.forEach((campo => {
-      if (req.body[campo] !== undefined) {
-        egresado[campo] = req.body[campo];
-      }
-    }))
-
-    egresado.actualizadoEn = Date.now();
-    const actualizado = await egresado.save();
-
-    res.json({
-      success: true,
-      msg: "Información actualizada correctamente",
-      egresado: actualizado
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      msg: "Error en el servidor"
-    });
-  }
-}
-*/
 export const actualizarFotoPerfil = async (req, res) => {
   try {
     const egresado = await Egresado.findOne({ usuario: req.usuario._id });
@@ -229,9 +111,9 @@ export const actualizarFotoPerfil = async (req, res) => {
         const publicId = `egresados_fotos_perfil/${filename.split('.')[0]}`;
 
         await cloudinary.uploader.destroy(publicId);
-        console.log("✅ Imagen anterior eliminada");
+        console.log("Imagen anterior eliminada");
       } catch (error) {
-        console.log("⚠️ No se pudo eliminar la imagen anterior:", error.message);
+        console.log("No se pudo eliminar la imagen anterior:", error.message);
       }
     }
 
@@ -254,7 +136,7 @@ export const actualizarFotoPerfil = async (req, res) => {
         const fs = await import('fs');
         fs.unlinkSync(req.file.path);
       } catch (err) {
-        console.log("⚠️ No se pudo eliminar archivo temporal");
+        console.log("No se pudo eliminar archivo temporal");
       }
     }
 

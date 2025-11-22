@@ -16,6 +16,7 @@ const checkAdmin = (req, res, next) => {
       });
     }
 
+    // Verificar rol que sea usuario comun
     if (req.usuario.rol !== 'administrador') {
       return res.status(403).json({
         success: false,

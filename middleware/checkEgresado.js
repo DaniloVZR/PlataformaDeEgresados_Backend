@@ -1,4 +1,3 @@
-// middleware/checkEgresado.js
 import Egresado from '../models/Egresado.js';
 
 const checkEgresado = async (req, res, next) => {
@@ -14,25 +13,16 @@ const checkEgresado = async (req, res, next) => {
     const egresado = await Egresado.findOne({ usuario: req.usuario._id });
 
     if (!egresado) {
-      return res.status(404).json({
-        success: false,
-        message: 'Perfil de egresado no encontrado. Por favor completa tu perfil primero.'
-      });
-    }
-
-    // Si no existe, crearlo automáticamente
-    if (!egresado) {
-      const nuevoEgresado = new Egresado({
+      egresado = new Egresado({
         usuario: req.usuario._id,
         nombre: req.usuario.nombre,
         email: req.usuario.correo,
         completadoPerfil: false
       });
-      await nuevoEgresado.save();
-      req.egresado = nuevoEgresado;
-    } else {
-      req.egresado = egresado;
+      await egresado.save();
     }
+
+    req.egresado = egresado;
 
     // Opcional: verificar que el perfil esté completo
     if (!egresado.completadoPerfil) {

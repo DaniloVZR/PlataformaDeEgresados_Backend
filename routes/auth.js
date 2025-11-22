@@ -18,7 +18,9 @@ router.post('/recuperar-password/:token', validarNuevaPassword, nuevaPassword);
 
 // Perfil
 router.get('/perfil', checkAuth, perfil);
-router.post('logout', logout);
+
+// Logout
+router.post('/logout', checkAuth, logout);
 
 export default router;
 
