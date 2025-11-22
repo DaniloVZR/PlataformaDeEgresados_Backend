@@ -36,12 +36,14 @@ export const crearComentario = async (req, res) => {
     });
 
     await nuevoComentario.save();
-    await nuevoComentario.populate('autor', 'nombre apellido fotoPerfil');
+    const comentarioPopulado = await Comentario.findById(nuevoComentario._id)
+      .populate('autor', 'nombre apellido fotoPerfil')
+      .lean();
 
     res.status(201).json({
       success: true,
       msg: "Comentario creado exitosamente",
-      comentario: nuevoComentario
+      comentario: comentarioPopulado
     });
 
   } catch (error) {
