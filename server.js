@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js';
 import egresadoRoutes from './routes/egresado.routes.js';
 import publicacionRoutes from './routes/publicacion.route.js';
 import administradorRoutes from './routes/administrador.routes.js';
+import comentarioRoutes from './routes/comentario.routes.js';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
@@ -34,10 +35,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
 app.use(express.json());
-
-// app.use(mongoSanitize());
 
 app.get('/', (req, res) => {
   res.send('API is running...');
@@ -46,6 +44,7 @@ app.get('/', (req, res) => {
 app.use('/api/usuario', authRoutes);
 app.use('/api/egresado', egresadoRoutes);
 app.use('/api/publicacion', publicacionRoutes);
+app.use('/api/comentario', comentarioRoutes);
 app.use('/api/admin', administradorRoutes);
 
 const PORT = process.env.PORT || 5000;
