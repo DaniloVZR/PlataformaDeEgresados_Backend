@@ -278,7 +278,7 @@ export const editarPublicacion = async (req, res) => {
 
 export const toggleLike = async (req, res) => {
   try {
-    const publicacion = await Publicacion.findById(req.params.id)
+    const publicacion = await Publicacion.findById(req.params.id);
 
     if (!publicacion) {
       return res.status(404).json({
@@ -287,39 +287,43 @@ export const toggleLike = async (req, res) => {
       });
     }
 
-    const userId = req.egresado._id; // ID del usuario actual
-    const tieneLike = publicacion.likes.includes(userId);
+    const odIdEgresado = req.egresado._id;
+    const tieneLike = publicacion.likes.some(
+      id => id.toString() === odIdEgresado.toString()
+    );
 
     if (tieneLike) {
-      // Quitar like
       publicacion.likes = publicacion.likes.filter(
-        id => id.toString() !== userId.toString()
+        id => id.toString() !== odIdEgresado.toString()
       );
     } else {
-      // Agregar like
-      publicacion.likes.push(userId);
+      publicacion.likes.push(odIdEgresado);
     }
 
     await publicacion.save();
-    await publicacion.populate('likes', 'nombre apellido fotoPerfil');
+
+    // Buscar la publicación con likes populados
+    const publicacionActualizada = await Publicacion.findById(req.params.id)
+      .populate('likes', 'nombre apellido fotoPerfil')
+      .lean();
 
     res.json({
       success: true,
       msg: tieneLike ? "Like eliminado" : "Like agregado",
-      likes: publicacion.likes.length,
+      likes: publicacionActualizada.likes.length,
       liked: !tieneLike,
-      userId: userId.toString(),
-      likesData: publicacion.likes
+      likesData: publicacionActualizada.likes
     });
 
   } catch (error) {
+    console.error('Error en toggleLike:', error);
     res.status(500).json({
       success: false,
       message: "Error al procesar el like",
       error: error.message
     });
   }
-}
+};
 
 export const obtenerPublicacionesLikeadas = async (req, res) => {
   try {
