@@ -147,7 +147,7 @@ export const obtenerPublicacionesPorEgresado = async (req, res) => {
     }
 
     const publicaciones = await Publicacion.find({ autor: egresadoId })
-      .populate('autor', 'nombre apellido')
+      .populate('autor', 'nombre apellido fotoPerfil programaAcademico yearGraduacion')
       .populate('likes', 'nombre apellido fotoPerfil')
       .sort({ createdAt: -1 })
       .limit(limit * 1)

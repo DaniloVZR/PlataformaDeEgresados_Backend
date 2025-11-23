@@ -25,6 +25,136 @@ export const obtenerEgresado = async (req, res) => {
   }
 }
 
+export const obtenerPerfilPublico = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const egresado = await Egresado.findById(id)
+      .select('-usuario -actualizadoEn -__v')
+      .lean();
+
+    if (!egresado) {
+      return res.status(404).json({
+        success: false,
+        msg: "Egresado no encontrado"
+      });
+    }
+
+    res.json({
+      success: true,
+      egresado
+    });
+
+  } catch (error) {
+    console.error('Error al obtener perfil público:', error);
+    res.status(500).json({
+      success: false,
+      msg: "Error al obtener el perfil"
+    });
+  }
+}
+
+export const buscarEgresados = async (req, res) => {
+  try {
+    const {
+      q,                    // búsqueda general (nombre, apellido)
+      programa,             // programa académico
+      yearGraduacion,       // año de graduación
+      page = 1,
+      limit = 12
+    } = req.query;
+
+    const filtros = {
+      completadoPerfil: true  // Solo mostrar perfiles completos
+    };
+
+    // Búsqueda por nombre o apellido
+    if (q && q.trim()) {
+      const searchRegex = new RegExp(q.trim(), 'i');
+      filtros.$or = [
+        { nombre: searchRegex },
+        { apellido: searchRegex }
+      ];
+    }
+
+    // Filtro por programa académico
+    if (programa && programa.trim()) {
+      filtros.programaAcademico = new RegExp(programa.trim(), 'i');
+    }
+
+    // Filtro por año de graduación
+    if (yearGraduacion) {
+      filtros.yearGraduacion = parseInt(yearGraduacion);
+    }
+
+    const egresados = await Egresado.find(filtros)
+      .select('nombre apellido fotoPerfil programaAcademico yearGraduacion descripcion')
+      .sort({ nombre: 1, apellido: 1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    const total = await Egresado.countDocuments(filtros);
+
+    res.json({
+      success: true,
+      egresados,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Number(page),
+      total
+    });
+
+  } catch (error) {
+    console.error('Error en búsqueda de egresados:', error);
+    res.status(500).json({
+      success: false,
+      msg: "Error al buscar egresados"
+    });
+  }
+}
+
+export const obtenerProgramasAcademicos = async (req, res) => {
+  try {
+    const programas = await Egresado.distinct('programaAcademico', {
+      programaAcademico: { $ne: '' },
+      completadoPerfil: true
+    });
+
+    res.json({
+      success: true,
+      programas: programas.sort()
+    });
+
+  } catch (error) {
+    console.error('Error al obtener programas:', error);
+    res.status(500).json({
+      success: false,
+      msg: "Error al obtener programas académicos"
+    });
+  }
+}
+
+export const obtenerYearsGraduacion = async (req, res) => {
+  try {
+    const years = await Egresado.distinct('yearGraduacion', {
+      yearGraduacion: { $ne: null },
+      completadoPerfil: true
+    });
+
+    res.json({
+      success: true,
+      years: years.sort((a, b) => b - a)
+    });
+
+  } catch (error) {
+    console.error('Error al obtener años:', error);
+    res.status(500).json({
+      success: false,
+      msg: "Error al obtener años de graduación"
+    });
+  }
+}
+
 export const completarPerfil = async (req, res) => {
   try {
     const usuarioId = req.usuario._id;
