@@ -75,23 +75,22 @@ export const obtenerPerfilPublico = async (req, res) => {
 
 export const buscarEgresados = async (req, res) => {
   try {
-    const {
-      q,
-      programa,
-      yearGraduacion,
-      page = 1,
-      limit = 12
-    } = req.query;
+    // Convertir explícitamente a String
+    const qStr = req.query.q ? String(req.query.q) : null;
+    const programaStr = req.query.programa ? String(req.query.programa) : null;
+    const yearStr = req.query.yearGraduacion ? String(req.query.yearGraduacion) : null;
+    const pageStr = String(req.query.page || '1');
+    const limitStr = String(req.query.limit || '12');
 
     const filtros = {
       completadoPerfil: true
     };
 
     // SANITIZAR búsqueda general
-    if (q && q.trim()) {
-      const qSanitizado = sanitizarBusqueda(q);
+    if (qStr && qStr.trim()) {
+      const qSanitizado = sanitizarBusqueda(qStr);
       if (qSanitizado) {
-        const searchRegex = new RegExp(qSanitizado, 'i');
+        const searchRegex = new RegExp(String(qSanitizado), 'i');
         filtros.$or = [
           { nombre: searchRegex },
           { apellido: searchRegex }
@@ -100,30 +99,30 @@ export const buscarEgresados = async (req, res) => {
     }
 
     // SANITIZAR programa académico
-    if (programa && programa.trim()) {
-      const programaSanitizado = sanitizarBusqueda(programa);
+    if (programaStr && programaStr.trim()) {
+      const programaSanitizado = sanitizarBusqueda(programaStr);
       if (programaSanitizado) {
-        filtros.programaAcademico = new RegExp(programaSanitizado, 'i');
+        filtros.programaAcademico = new RegExp(String(programaSanitizado), 'i');
       }
     }
 
     // VALIDAR año de graduación
-    if (yearGraduacion) {
-      const year = parseInt(yearGraduacion);
+    if (yearStr) {
+      const year = parseInt(yearStr, 10);
       if (!isNaN(year) && year >= 1900 && year <= new Date().getFullYear() + 5) {
-        filtros.yearGraduacion = year;
+        filtros.yearGraduacion = Number(year);
       }
     }
 
-    // Validar paginación
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 12));
+    // Validar paginación (garantizar numbers)
+    const pageNum = Math.max(1, parseInt(pageStr, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limitStr, 10) || 12));
 
     const egresados = await Egresado.find(filtros)
       .select('nombre apellido fotoPerfil programaAcademico yearGraduacion descripcion')
       .sort({ nombre: 1, apellido: 1 })
-      .limit(limitNum)
-      .skip((pageNum - 1) * limitNum)
+      .limit(Number(limitNum))
+      .skip(Number((pageNum - 1) * limitNum))
       .lean();
 
     const total = await Egresado.countDocuments(filtros);
@@ -132,7 +131,7 @@ export const buscarEgresados = async (req, res) => {
       success: true,
       egresados,
       totalPages: Math.ceil(total / limitNum),
-      currentPage: pageNum,
+      currentPage: Number(pageNum),
       total
     });
 
@@ -200,53 +199,52 @@ export const completarPerfil = async (req, res) => {
       });
     }
 
-    const {
-      nombre,
-      apellido,
-      programaAcademico,
-      yearGraduacion,
-      descripcion,
-      redesSociales
-    } = req.body;
+    // Convertir explícitamente a String
+    const nombreStr = req.body.nombre ? String(req.body.nombre) : null;
+    const apellidoStr = req.body.apellido ? String(req.body.apellido) : null;
+    const programaStr = req.body.programaAcademico ? String(req.body.programaAcademico) : null;
+    const yearStr = req.body.yearGraduacion ? String(req.body.yearGraduacion) : null;
+    const descripcionStr = req.body.descripcion !== undefined ? String(req.body.descripcion) : null;
+    const redesSociales = req.body.redesSociales;
 
     // SANITIZAR inputs de texto
-    if (nombre) {
-      const nombreSanitizado = sanitizarBusqueda(nombre);
-      if (nombreSanitizado) egresado.nombre = nombreSanitizado;
+    if (nombreStr) {
+      const nombreSanitizado = sanitizarBusqueda(nombreStr);
+      if (nombreSanitizado) egresado.nombre = String(nombreSanitizado);
     }
 
-    if (apellido) {
-      const apellidoSanitizado = sanitizarBusqueda(apellido);
-      if (apellidoSanitizado) egresado.apellido = apellidoSanitizado;
+    if (apellidoStr) {
+      const apellidoSanitizado = sanitizarBusqueda(apellidoStr);
+      if (apellidoSanitizado) egresado.apellido = String(apellidoSanitizado);
     }
 
-    if (programaAcademico) {
-      const programaSanitizado = sanitizarBusqueda(programaAcademico);
-      if (programaSanitizado) egresado.programaAcademico = programaSanitizado;
+    if (programaStr) {
+      const programaSanitizado = sanitizarBusqueda(programaStr);
+      if (programaSanitizado) egresado.programaAcademico = String(programaSanitizado);
     }
 
     // VALIDAR año de graduación
-    if (yearGraduacion) {
-      const year = parseInt(yearGraduacion);
+    if (yearStr) {
+      const year = parseInt(yearStr, 10);
       if (!isNaN(year) && year >= 1900 && year <= new Date().getFullYear() + 5) {
-        egresado.yearGraduacion = year;
+        egresado.yearGraduacion = Number(year);
       }
     }
 
-    if (descripcion !== undefined) {
-      const descripcionSanitizada = sanitizarBusqueda(descripcion);
-      egresado.descripcion = descripcionSanitizada;
+    if (descripcionStr !== null) {
+      const descripcionSanitizada = sanitizarBusqueda(descripcionStr);
+      egresado.descripcion = String(descripcionSanitizada);
     }
 
     // SANITIZAR URLs de redes sociales
-    if (redesSociales) {
+    if (redesSociales && typeof redesSociales === 'object') {
       const redesSanitizadas = {};
       const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b/;
 
       for (const [red, url] of Object.entries(redesSociales)) {
         if (['linkedin', 'github', 'twitter', 'instagram'].includes(red)) {
-          if (url && typeof url === 'string' && urlRegex.test(url)) {
-            redesSanitizadas[red] = url.substring(0, 200);
+          if (url && typeof url === 'string' && urlRegex.test(String(url))) {
+            redesSanitizadas[red] = String(url).substring(0, 200);
           } else {
             redesSanitizadas[red] = '';
           }
