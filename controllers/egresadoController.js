@@ -1,6 +1,17 @@
 import Egresado from "../models/Egresado.js";
 import { v2 as cloudinary } from 'cloudinary';
 
+// Helper para sanitizar búsquedas
+const sanitizarBusqueda = (texto) => {
+  if (!texto || typeof texto !== 'string') return '';
+  return texto.replace(/[^\w\s@.-]/gi, '').trim().substring(0, 100);
+};
+
+// Helper para validar ObjectId
+const esObjectIdValido = (id) => {
+  return id && id.match(/^[0-9a-fA-F]{24}$/);
+};
+
 export const obtenerEgresado = async (req, res) => {
   try {
     const egresado = await Egresado.findOne({ usuario: req.usuario._id }).populate('usuario', 'nombre correo');
@@ -28,6 +39,14 @@ export const obtenerEgresado = async (req, res) => {
 export const obtenerPerfilPublico = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // VALIDAR ObjectId
+    if (!esObjectIdValido(id)) {
+      return res.status(400).json({
+        success: false,
+        msg: "ID de egresado inválido"
+      });
+    }
 
     const egresado = await Egresado.findById(id)
       .select('-usuario -actualizadoEn -__v')
@@ -57,41 +76,54 @@ export const obtenerPerfilPublico = async (req, res) => {
 export const buscarEgresados = async (req, res) => {
   try {
     const {
-      q,                    // búsqueda general (nombre, apellido)
-      programa,             // programa académico
-      yearGraduacion,       // año de graduación
+      q,
+      programa,
+      yearGraduacion,
       page = 1,
       limit = 12
     } = req.query;
 
     const filtros = {
-      completadoPerfil: true  // Solo mostrar perfiles completos
+      completadoPerfil: true
     };
 
-    // Búsqueda por nombre o apellido
+    // SANITIZAR búsqueda general
     if (q && q.trim()) {
-      const searchRegex = new RegExp(q.trim(), 'i');
-      filtros.$or = [
-        { nombre: searchRegex },
-        { apellido: searchRegex }
-      ];
+      const qSanitizado = sanitizarBusqueda(q);
+      if (qSanitizado) {
+        const searchRegex = new RegExp(qSanitizado, 'i');
+        filtros.$or = [
+          { nombre: searchRegex },
+          { apellido: searchRegex }
+        ];
+      }
     }
 
-    // Filtro por programa académico
+    // SANITIZAR programa académico
     if (programa && programa.trim()) {
-      filtros.programaAcademico = new RegExp(programa.trim(), 'i');
+      const programaSanitizado = sanitizarBusqueda(programa);
+      if (programaSanitizado) {
+        filtros.programaAcademico = new RegExp(programaSanitizado, 'i');
+      }
     }
 
-    // Filtro por año de graduación
+    // VALIDAR año de graduación
     if (yearGraduacion) {
-      filtros.yearGraduacion = parseInt(yearGraduacion);
+      const year = parseInt(yearGraduacion);
+      if (!isNaN(year) && year >= 1900 && year <= new Date().getFullYear() + 5) {
+        filtros.yearGraduacion = year;
+      }
     }
+
+    // Validar paginación
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 12));
 
     const egresados = await Egresado.find(filtros)
       .select('nombre apellido fotoPerfil programaAcademico yearGraduacion descripcion')
       .sort({ nombre: 1, apellido: 1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum)
       .lean();
 
     const total = await Egresado.countDocuments(filtros);
@@ -99,8 +131,8 @@ export const buscarEgresados = async (req, res) => {
     res.json({
       success: true,
       egresados,
-      totalPages: Math.ceil(total / limit),
-      currentPage: Number(page),
+      totalPages: Math.ceil(total / limitNum),
+      currentPage: pageNum,
       total
     });
 
@@ -159,7 +191,6 @@ export const completarPerfil = async (req, res) => {
   try {
     const usuarioId = req.usuario._id;
 
-    // Buscar perfil
     const egresado = await Egresado.findOne({ usuario: usuarioId });
 
     if (!egresado) {
@@ -178,16 +209,53 @@ export const completarPerfil = async (req, res) => {
       redesSociales
     } = req.body;
 
-    // Actualizar campos
-    if (nombre) egresado.nombre = nombre;
-    if (apellido) egresado.apellido = apellido;
-    if (programaAcademico) egresado.programaAcademico = programaAcademico;
-    if (yearGraduacion) egresado.yearGraduacion = yearGraduacion;
-    if (descripcion !== undefined) egresado.descripcion = descripcion;
+    // SANITIZAR inputs de texto
+    if (nombre) {
+      const nombreSanitizado = sanitizarBusqueda(nombre);
+      if (nombreSanitizado) egresado.nombre = nombreSanitizado;
+    }
+
+    if (apellido) {
+      const apellidoSanitizado = sanitizarBusqueda(apellido);
+      if (apellidoSanitizado) egresado.apellido = apellidoSanitizado;
+    }
+
+    if (programaAcademico) {
+      const programaSanitizado = sanitizarBusqueda(programaAcademico);
+      if (programaSanitizado) egresado.programaAcademico = programaSanitizado;
+    }
+
+    // VALIDAR año de graduación
+    if (yearGraduacion) {
+      const year = parseInt(yearGraduacion);
+      if (!isNaN(year) && year >= 1900 && year <= new Date().getFullYear() + 5) {
+        egresado.yearGraduacion = year;
+      }
+    }
+
+    if (descripcion !== undefined) {
+      const descripcionSanitizada = sanitizarBusqueda(descripcion);
+      egresado.descripcion = descripcionSanitizada;
+    }
+
+    // SANITIZAR URLs de redes sociales
     if (redesSociales) {
+      const redesSanitizadas = {};
+      const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b/;
+
+      for (const [red, url] of Object.entries(redesSociales)) {
+        if (['linkedin', 'github', 'twitter', 'instagram'].includes(red)) {
+          if (url && typeof url === 'string' && urlRegex.test(url)) {
+            redesSanitizadas[red] = url.substring(0, 200);
+          } else {
+            redesSanitizadas[red] = '';
+          }
+        }
+      }
+
       egresado.redesSociales = {
         ...egresado.redesSociales,
-        ...redesSociales
+        ...redesSanitizadas
       };
     }
 
@@ -206,7 +274,8 @@ export const completarPerfil = async (req, res) => {
         : "Perfil actualizado",
       egresado
     });
-  } catch {
+  } catch (error) {
+    console.error('Error al completar perfil:', error);
     res.status(500).json({
       success: false,
       msg: "Error en el servidor"
@@ -232,16 +301,12 @@ export const actualizarFotoPerfil = async (req, res) => {
       });
     }
 
-    // Verificar si hay foto
     if (egresado.fotoPerfil) {
       try {
-        // Eliminar foto anterior en Cloudinary
         const urlParts = egresado.fotoPerfil.split('/');
         const filename = urlParts[urlParts.length - 1];
         const publicId = `egresados_fotos_perfil/${filename.split('.')[0]}`;
-
         await cloudinary.uploader.destroy(publicId);
-        console.log("Imagen anterior eliminada");
       } catch (error) {
         console.log("No se pudo eliminar la imagen anterior:", error.message);
       }
@@ -254,8 +319,6 @@ export const actualizarFotoPerfil = async (req, res) => {
         { quality: 'auto' }
       ]
     });
-
-    console.log("Imagen subida a Cloudinary:", result.secure_url);
 
     egresado.fotoPerfil = result.secure_url;
     egresado.actualizadoEn = Date.now();
@@ -277,6 +340,7 @@ export const actualizarFotoPerfil = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Error al actualizar foto de perfil:', error);
     res.status(500).json({
       success: false,
       msg: "Error al actualizar la foto de perfil"

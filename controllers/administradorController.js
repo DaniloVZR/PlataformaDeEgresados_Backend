@@ -2,6 +2,34 @@ import Usuario from "../models/Usuario.js";
 import Egresado from "../models/Egresado.js";
 import Publicacion from "../models/Publicacion.js";
 
+// ==================== HELPERS DE VALIDACIÓN ====================
+
+/**
+ * Valida y sanitiza el rol del usuario
+ */
+const validarRol = (rol) => {
+  const rolesPermitidos = ['comun', 'administrador'];
+  return rolesPermitidos.includes(rol) ? rol : null;
+};
+
+/**
+ * Valida y sanitiza el estado activo
+ */
+const validarEstadoActivo = (activo) => {
+  if (activo === 'true' || activo === true) return true;
+  if (activo === 'false' || activo === false) return false;
+  return undefined;
+};
+
+/**
+ * Sanitiza texto de búsqueda para prevenir ReDoS y NoSQL injection
+ */
+const sanitizarBusqueda = (texto) => {
+  if (!texto || typeof texto !== 'string') return '';
+  // Remover caracteres especiales que pueden causar problemas
+  return texto.replace(/[^\w\s@.-]/gi, '').trim().substring(0, 100);
+};
+
 // ==================== MÉTRICAS ====================
 
 export const obtenerMetricasGenerales = async (req, res) => {
@@ -11,31 +39,26 @@ export const obtenerMetricasGenerales = async (req, res) => {
     const usuariosActivos = await Usuario.countDocuments({ activo: true });
     const usuariosBaneados = await Usuario.countDocuments({ activo: false });
 
-    // Usuarios registrados en los últimos 30 días
     const hace30Dias = new Date();
     hace30Dias.setDate(hace30Dias.getDate() - 30);
     const nuevosUsuarios = await Usuario.countDocuments({
       createdAt: { $gte: hace30Dias }
     });
 
-    // Publicaciones de los últimos 30 días
     const nuevasPublicaciones = await Publicacion.countDocuments({
       createdAt: { $gte: hace30Dias }
     });
 
-    // Publicaciones de los últimos 7 días
     const hace7Dias = new Date();
     hace7Dias.setDate(hace7Dias.getDate() - 7);
     const publicacionesSemanales = await Publicacion.countDocuments({
       createdAt: { $gte: hace7Dias }
     });
 
-    // Usuarios con perfil completo
     const perfilesCompletos = await Egresado.countDocuments({
       completadoPerfil: true
     });
 
-    // Total de likes en todas las publicaciones
     const publicaciones = await Publicacion.find().select('likes');
     const totalLikes = publicaciones.reduce((sum, pub) => sum + pub.likes.length, 0);
 
@@ -68,7 +91,6 @@ export const obtenerMetricasGenerales = async (req, res) => {
 
 export const obtenerEstadisticasDetalladas = async (req, res) => {
   try {
-    // Top 5 usuarios con más publicaciones
     const topPublicadores = await Publicacion.aggregate([
       { $group: { _id: "$autor", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
@@ -93,7 +115,6 @@ export const obtenerEstadisticasDetalladas = async (req, res) => {
       }
     ]);
 
-    // Top 5 publicaciones con más likes
     const topPublicaciones = await Publicacion.find()
       .select('descripcion imagen likes createdAt')
       .populate('autor', 'nombre apellido fotoPerfil')
@@ -110,14 +131,12 @@ export const obtenerEstadisticasDetalladas = async (req, res) => {
       createdAt: pub.createdAt
     }));
 
-    // Distribución por programa académico
     const distribucionProgramas = await Egresado.aggregate([
       { $match: { programaAcademico: { $ne: "" } } },
       { $group: { _id: "$programaAcademico", count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
-    // Distribución por año de graduación
     const distribucionGraduacion = await Egresado.aggregate([
       { $match: { yearGraduacion: { $ne: null } } },
       { $group: { _id: "$yearGraduacion", count: { $sum: 1 } } },
@@ -154,22 +173,45 @@ export const listarUsuarios = async (req, res) => {
       buscar
     } = req.query;
 
+    // VALIDACIÓN Y SANITIZACIÓN
     const filtros = {};
 
-    if (rol) filtros.rol = rol;
-    if (activo !== undefined) filtros.activo = activo === 'true';
-    if (buscar) {
-      filtros.$or = [
-        { nombre: { $regex: buscar, $options: 'i' } },
-        { correo: { $regex: buscar, $options: 'i' } }
-      ];
+    // Validar rol
+    if (rol) {
+      const rolValidado = validarRol(rol);
+      if (rolValidado) {
+        filtros.rol = rolValidado;
+      }
     }
+
+    // Validar activo
+    if (activo !== undefined) {
+      const activoValidado = validarEstadoActivo(activo);
+      if (activoValidado !== undefined) {
+        filtros.activo = activoValidado;
+      }
+    }
+
+    // Sanitizar búsqueda
+    if (buscar) {
+      const busquedaSanitizada = sanitizarBusqueda(buscar);
+      if (busquedaSanitizada) {
+        filtros.$or = [
+          { nombre: { $regex: busquedaSanitizada, $options: 'i' } },
+          { correo: { $regex: busquedaSanitizada, $options: 'i' } }
+        ];
+      }
+    }
+
+    // Validar paginación
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 10));
 
     const usuarios = await Usuario.find(filtros)
       .select('-password -token')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum)
       .lean();
 
     const total = await Usuario.countDocuments(filtros);
@@ -177,8 +219,8 @@ export const listarUsuarios = async (req, res) => {
     res.json({
       success: true,
       usuarios,
-      totalPages: Math.ceil(total / limit),
-      currentPage: Number(page),
+      totalPages: Math.ceil(total / limitNum),
+      currentPage: pageNum,
       total
     });
   } catch (error) {
@@ -194,6 +236,14 @@ export const obtenerDetalleUsuario = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validar que sea un ObjectId válido
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        msg: "ID de usuario inválido"
+      });
+    }
+
     const usuario = await Usuario.findById(id)
       .select('-password -token')
       .lean();
@@ -208,7 +258,6 @@ export const obtenerDetalleUsuario = async (req, res) => {
     const egresado = await Egresado.findOne({ usuario: id }).lean();
     const publicaciones = await Publicacion.countDocuments({ autor: egresado?._id });
 
-    // Total de likes recibidos
     let totalLikes = 0;
     if (egresado) {
       const pubs = await Publicacion.find({ autor: egresado._id }).select('likes');
@@ -240,7 +289,17 @@ export const cambiarRolUsuario = async (req, res) => {
     const { id } = req.params;
     const { rol } = req.body;
 
-    if (!['comun', 'administrador'].includes(rol)) {
+    // VALIDACIÓN 1: Validar ObjectId
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        msg: "ID de usuario inválido"
+      });
+    }
+
+    // VALIDACIÓN 2: Validar rol
+    const rolValidado = validarRol(rol);
+    if (!rolValidado) {
       return res.status(400).json({
         success: false,
         msg: "Rol inválido. Debe ser 'comun' o 'administrador'"
@@ -257,19 +316,20 @@ export const cambiarRolUsuario = async (req, res) => {
     }
 
     // Prevenir que un admin se quite sus propios privilegios
-    if (usuario._id.toString() === req.usuario._id.toString() && rol === 'comun') {
+    if (usuario._id.toString() === req.usuario._id.toString() && rolValidado === 'comun') {
       return res.status(400).json({
         success: false,
         msg: "No puedes cambiar tu propio rol de administrador"
       });
     }
 
-    usuario.rol = rol;
+    // USAR VALOR VALIDADO
+    usuario.rol = rolValidado;
     await usuario.save();
 
     res.json({
       success: true,
-      msg: `Rol actualizado exitosamente a ${rol}`,
+      msg: `Rol actualizado exitosamente a ${rolValidado}`,
       usuario: {
         id: usuario._id,
         nombre: usuario.nombre,
@@ -290,6 +350,17 @@ export const toggleBanUsuario = async (req, res) => {
   try {
     const { id } = req.params;
     const { razon } = req.body;
+
+    // Validar ObjectId
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        msg: "ID de usuario inválido"
+      });
+    }
+
+    // Sanitizar razón
+    const razonSanitizada = razon ? sanitizarBusqueda(razon) : 'No especificada';
 
     const usuario = await Usuario.findById(id);
 
@@ -330,7 +401,7 @@ export const toggleBanUsuario = async (req, res) => {
         correo: usuario.correo,
         activo: usuario.activo
       },
-      razon: razon || 'No especificada'
+      razon: razonSanitizada
     });
   } catch (error) {
     console.error('Error al suspender/reactivar usuario:', error);
@@ -348,9 +419,18 @@ export const listarPublicacionesAdmin = async (req, res) => {
     const { page = 1, limit = 10, buscar } = req.query;
 
     const filtros = {};
+
+    // Sanitizar búsqueda
     if (buscar) {
-      filtros.descripcion = { $regex: buscar, $options: 'i' };
+      const busquedaSanitizada = sanitizarBusqueda(buscar);
+      if (busquedaSanitizada) {
+        filtros.descripcion = { $regex: busquedaSanitizada, $options: 'i' };
+      }
     }
+
+    // Validar paginación
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 10));
 
     const publicaciones = await Publicacion.find(filtros)
       .populate('autor', 'nombre apellido fotoPerfil email')
@@ -362,8 +442,8 @@ export const listarPublicacionesAdmin = async (req, res) => {
         }
       })
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum)
       .lean();
 
     const total = await Publicacion.countDocuments(filtros);
@@ -371,8 +451,8 @@ export const listarPublicacionesAdmin = async (req, res) => {
     res.json({
       success: true,
       publicaciones,
-      totalPages: Math.ceil(total / limit),
-      currentPage: Number(page),
+      totalPages: Math.ceil(total / limitNum),
+      currentPage: pageNum,
       total
     });
   } catch (error) {
@@ -388,6 +468,17 @@ export const eliminarPublicacionAdmin = async (req, res) => {
   try {
     const { id } = req.params;
     const { razon } = req.body;
+
+    // Validar ObjectId
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        msg: "ID de publicación inválido"
+      });
+    }
+
+    // Sanitizar razón
+    const razonSanitizada = razon ? sanitizarBusqueda(razon) : 'No especificada';
 
     const publicacion = await Publicacion.findById(id);
 
@@ -414,7 +505,7 @@ export const eliminarPublicacionAdmin = async (req, res) => {
     res.json({
       success: true,
       msg: "Publicación eliminada exitosamente por el administrador",
-      razon: razon || 'No especificada'
+      razon: razonSanitizada
     });
   } catch (error) {
     console.error('Error al eliminar publicación:', error);
