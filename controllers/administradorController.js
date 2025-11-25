@@ -179,7 +179,7 @@ export const listarUsuarios = async (req, res) => {
     if (rolStr) {
       const rolValidado = validarRol(rolStr);
       if (rolValidado) {
-        filtros.rol = String(rolValidado); // Garantizar que es string
+        filtros.rol = String(rolValidado);
       }
     }
 
@@ -187,16 +187,16 @@ export const listarUsuarios = async (req, res) => {
     if (activoStr) {
       const activoValidado = validarEstadoActivo(activoStr);
       if (activoValidado !== undefined) {
-        filtros.activo = Boolean(activoValidado); // Garantizar que es boolean
+        filtros.activo = Boolean(activoValidado);
       }
     }
 
     // Sanitizar búsqueda (solo strings)
-    if (buscarStr) {
+    if (buscarStr && buscarStr.trim() !== '') {
       const busquedaSanitizada = sanitizarBusqueda(buscarStr);
       if (busquedaSanitizada) {
-        // Usar strings literales en lugar de regex para mayor seguridad
-        const searchPattern = String(busquedaSanitizada);
+        // CORRECCIÓN: Escapar caracteres especiales de regex
+        const searchPattern = busquedaSanitizada.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         filtros.$or = [
           { nombre: { $regex: searchPattern, $options: 'i' } },
           { correo: { $regex: searchPattern, $options: 'i' } }
@@ -426,10 +426,12 @@ export const listarPublicacionesAdmin = async (req, res) => {
     const filtros = {};
 
     // Sanitizar búsqueda
-    if (buscarStr) {
+    if (buscarStr && buscarStr.trim() !== '') {
       const busquedaSanitizada = sanitizarBusqueda(buscarStr);
       if (busquedaSanitizada) {
-        filtros.descripcion = { $regex: String(busquedaSanitizada), $options: 'i' };
+        // CORRECCIÓN: Escapar caracteres especiales de regex
+        const searchPattern = busquedaSanitizada.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        filtros.descripcion = { $regex: searchPattern, $options: 'i' };
       }
     }
 
