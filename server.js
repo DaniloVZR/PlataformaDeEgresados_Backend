@@ -12,6 +12,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { configurarSocket } from './socket/socketHandler.js';
+import mongoSanitize from 'express-mongo-sanitize';
 
 dotenv.config();
 conectarDB();
@@ -42,6 +43,13 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+app.use(mongoSanitize({
+  replaceWith: '_',
+  onSanitize: ({ req, key }) => {
+    console.warn(`Se ha detectado y limpiado un intento de inyección en el campo: ${key}`);
+  }
+}));
 
 const io = new Server(httpServer, {
   cors: corsOptions
