@@ -1,6 +1,17 @@
 import Egresado from "../models/Egresado.js";
 import { v2 as cloudinary } from 'cloudinary';
 
+// Helper para sanitizar búsquedas
+const sanitizarBusqueda = (texto) => {
+  if (!texto || typeof texto !== 'string') return '';
+  return texto.replace(/[^\w\s@.-]/gi, '').trim().substring(0, 100);
+};
+
+// Helper para validar ObjectId
+const esObjectIdValido = (id) => {
+  return id && id.match(/^[0-9a-fA-F]{24}$/);
+};
+
 export const obtenerEgresado = async (req, res) => {
   try {
     const egresado = await Egresado.findOne({ usuario: req.usuario._id }).populate('usuario', 'nombre correo');
@@ -29,6 +40,14 @@ export const obtenerPerfilPublico = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // VALIDAR ObjectId
+    if (!esObjectIdValido(id)) {
+      return res.status(400).json({
+        success: false,
+        msg: "ID de egresado inválido"
+      });
+    }
+
     const egresado = await Egresado.findById(id)
       .select('-usuario -actualizadoEn -__v')
       .lean();
@@ -56,42 +75,54 @@ export const obtenerPerfilPublico = async (req, res) => {
 
 export const buscarEgresados = async (req, res) => {
   try {
-    const {
-      q,                    // búsqueda general (nombre, apellido)
-      programa,             // programa académico
-      yearGraduacion,       // año de graduación
-      page = 1,
-      limit = 12
-    } = req.query;
+    // Convertir explícitamente a String
+    const qStr = req.query.q ? String(req.query.q) : null;
+    const programaStr = req.query.programa ? String(req.query.programa) : null;
+    const yearStr = req.query.yearGraduacion ? String(req.query.yearGraduacion) : null;
+    const pageStr = String(req.query.page || '1');
+    const limitStr = String(req.query.limit || '12');
 
     const filtros = {
-      completadoPerfil: true  // Solo mostrar perfiles completos
+      completadoPerfil: true
     };
 
-    // Búsqueda por nombre o apellido
-    if (q && q.trim()) {
-      const searchRegex = new RegExp(q.trim(), 'i');
-      filtros.$or = [
-        { nombre: searchRegex },
-        { apellido: searchRegex }
-      ];
+    // SANITIZAR búsqueda general
+    if (qStr && qStr.trim()) {
+      const qSanitizado = sanitizarBusqueda(qStr);
+      if (qSanitizado) {
+        const searchRegex = new RegExp(String(qSanitizado), 'i');
+        filtros.$or = [
+          { nombre: searchRegex },
+          { apellido: searchRegex }
+        ];
+      }
     }
 
-    // Filtro por programa académico
-    if (programa && programa.trim()) {
-      filtros.programaAcademico = new RegExp(programa.trim(), 'i');
+    // SANITIZAR programa académico
+    if (programaStr && programaStr.trim()) {
+      const programaSanitizado = sanitizarBusqueda(programaStr);
+      if (programaSanitizado) {
+        filtros.programaAcademico = new RegExp(String(programaSanitizado), 'i');
+      }
     }
 
-    // Filtro por año de graduación
-    if (yearGraduacion) {
-      filtros.yearGraduacion = parseInt(yearGraduacion);
+    // VALIDAR año de graduación
+    if (yearStr) {
+      const year = parseInt(yearStr, 10);
+      if (!isNaN(year) && year >= 1900 && year <= new Date().getFullYear() + 5) {
+        filtros.yearGraduacion = Number(year);
+      }
     }
+
+    // Validar paginación (garantizar numbers)
+    const pageNum = Math.max(1, parseInt(pageStr, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limitStr, 10) || 12));
 
     const egresados = await Egresado.find(filtros)
       .select('nombre apellido fotoPerfil programaAcademico yearGraduacion descripcion')
       .sort({ nombre: 1, apellido: 1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(Number(limitNum))
+      .skip(Number((pageNum - 1) * limitNum))
       .lean();
 
     const total = await Egresado.countDocuments(filtros);
@@ -99,8 +130,8 @@ export const buscarEgresados = async (req, res) => {
     res.json({
       success: true,
       egresados,
-      totalPages: Math.ceil(total / limit),
-      currentPage: Number(page),
+      totalPages: Math.ceil(total / limitNum),
+      currentPage: Number(pageNum),
       total
     });
 
@@ -159,7 +190,6 @@ export const completarPerfil = async (req, res) => {
   try {
     const usuarioId = req.usuario._id;
 
-    // Buscar perfil
     const egresado = await Egresado.findOne({ usuario: usuarioId });
 
     if (!egresado) {
@@ -169,25 +199,61 @@ export const completarPerfil = async (req, res) => {
       });
     }
 
-    const {
-      nombre,
-      apellido,
-      programaAcademico,
-      yearGraduacion,
-      descripcion,
-      redesSociales
-    } = req.body;
+    // Convertir explícitamente a String
+    const nombreStr = req.body.nombre ? String(req.body.nombre) : null;
+    const apellidoStr = req.body.apellido ? String(req.body.apellido) : null;
+    const programaStr = req.body.programaAcademico ? String(req.body.programaAcademico) : null;
+    const yearStr = req.body.yearGraduacion ? String(req.body.yearGraduacion) : null;
+    const descripcionStr = req.body.descripcion !== undefined ? String(req.body.descripcion) : null;
+    const redesSociales = req.body.redesSociales;
 
-    // Actualizar campos
-    if (nombre) egresado.nombre = nombre;
-    if (apellido) egresado.apellido = apellido;
-    if (programaAcademico) egresado.programaAcademico = programaAcademico;
-    if (yearGraduacion) egresado.yearGraduacion = yearGraduacion;
-    if (descripcion !== undefined) egresado.descripcion = descripcion;
-    if (redesSociales) {
+    // SANITIZAR inputs de texto
+    if (nombreStr) {
+      const nombreSanitizado = sanitizarBusqueda(nombreStr);
+      if (nombreSanitizado) egresado.nombre = String(nombreSanitizado);
+    }
+
+    if (apellidoStr) {
+      const apellidoSanitizado = sanitizarBusqueda(apellidoStr);
+      if (apellidoSanitizado) egresado.apellido = String(apellidoSanitizado);
+    }
+
+    if (programaStr) {
+      const programaSanitizado = sanitizarBusqueda(programaStr);
+      if (programaSanitizado) egresado.programaAcademico = String(programaSanitizado);
+    }
+
+    // VALIDAR año de graduación
+    if (yearStr) {
+      const year = parseInt(yearStr, 10);
+      if (!isNaN(year) && year >= 1900 && year <= new Date().getFullYear() + 5) {
+        egresado.yearGraduacion = Number(year);
+      }
+    }
+
+    if (descripcionStr !== null) {
+      const descripcionSanitizada = sanitizarBusqueda(descripcionStr);
+      egresado.descripcion = String(descripcionSanitizada);
+    }
+
+    // SANITIZAR URLs de redes sociales
+    if (redesSociales && typeof redesSociales === 'object') {
+      const redesSanitizadas = {};
+      const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b/;
+
+      for (const [red, url] of Object.entries(redesSociales)) {
+        if (['linkedin', 'github', 'twitter', 'instagram'].includes(red)) {
+          if (url && typeof url === 'string' && urlRegex.test(String(url))) {
+            redesSanitizadas[red] = String(url).substring(0, 200);
+          } else {
+            redesSanitizadas[red] = '';
+          }
+        }
+      }
+
       egresado.redesSociales = {
         ...egresado.redesSociales,
-        ...redesSociales
+        ...redesSanitizadas
       };
     }
 
@@ -206,7 +272,8 @@ export const completarPerfil = async (req, res) => {
         : "Perfil actualizado",
       egresado
     });
-  } catch {
+  } catch (error) {
+    console.error('Error al completar perfil:', error);
     res.status(500).json({
       success: false,
       msg: "Error en el servidor"
@@ -232,16 +299,12 @@ export const actualizarFotoPerfil = async (req, res) => {
       });
     }
 
-    // Verificar si hay foto
     if (egresado.fotoPerfil) {
       try {
-        // Eliminar foto anterior en Cloudinary
         const urlParts = egresado.fotoPerfil.split('/');
         const filename = urlParts[urlParts.length - 1];
         const publicId = `egresados_fotos_perfil/${filename.split('.')[0]}`;
-
         await cloudinary.uploader.destroy(publicId);
-        console.log("Imagen anterior eliminada");
       } catch (error) {
         console.log("No se pudo eliminar la imagen anterior:", error.message);
       }
@@ -254,8 +317,6 @@ export const actualizarFotoPerfil = async (req, res) => {
         { quality: 'auto' }
       ]
     });
-
-    console.log("Imagen subida a Cloudinary:", result.secure_url);
 
     egresado.fotoPerfil = result.secure_url;
     egresado.actualizadoEn = Date.now();
@@ -277,6 +338,7 @@ export const actualizarFotoPerfil = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Error al actualizar foto de perfil:', error);
     res.status(500).json({
       success: false,
       msg: "Error al actualizar la foto de perfil"
