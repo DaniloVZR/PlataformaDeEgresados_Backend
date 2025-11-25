@@ -42,29 +42,32 @@ export const enviarMensaje = async (req, res) => {
 
     await nuevoMensaje.save();
 
+    // Populate el mensaje
     await nuevoMensaje.populate([
       { path: "emisor", select: "nombre apellido fotoPerfil" },
       { path: "receptor", select: "nombre apellido fotoPerfil" },
-    ])
+    ]);
 
-    // Socket
-
+    // ========== EMIT SOCKET EVENTS ==========
     const io = req.app.get("io");
+    const mensajeData = nuevoMensaje.toObject();
 
-    // Enviar mensaje
+    // Enviar al receptor
     io.to(receptorId).emit("mensaje:nuevo", {
-      mensaje: nuevoMensaje
+      mensaje: mensajeData
     });
 
-    // Notificar al emisor que el mensaje fue enviado
+    // Confirmar al emisor
     io.to(req.egresado._id.toString()).emit("mensaje:enviado", {
-      mensaje: nuevoMensaje
+      mensaje: mensajeData
     });
+
+    console.log(`✉️ Mensaje enviado: ${req.egresado._id} → ${receptorId}`);
 
     res.status(201).json({
       success: true,
       msg: "Mensaje enviado correctamente",
-      mensaje: nuevoMensaje
+      mensaje: mensajeData
     });
 
   } catch (error) {
@@ -78,7 +81,6 @@ export const enviarMensaje = async (req, res) => {
 
 export const obtenerConversacion = async (req, res) => {
   try {
-
     const { usuarioId } = req.params;
     const { page = 1, limit = 30 } = req.query;
 
@@ -127,7 +129,7 @@ export const obtenerConversacion = async (req, res) => {
       ]
     });
 
-    // Marcar mensajes como leídos
+    // Marcar como leídos
     await Mensaje.updateMany(
       {
         emisor: usuarioId,
@@ -137,7 +139,7 @@ export const obtenerConversacion = async (req, res) => {
       { $set: { leido: true } }
     );
 
-    // Notificar al emisor que sus mensajes han sido leídos
+    // Notificar al emisor vía socket
     const io = req.app.get('io');
     io.to(usuarioId).emit('mensajes:leidos', {
       receptorId: req.egresado._id.toString()
@@ -176,7 +178,7 @@ export const obtenerConversaciones = async (req, res) => {
 
     const usuariosIds = [
       ...new Set([...mensajesEnviados, ...mensajesRecibidos])
-    ]
+    ];
 
     const conversaciones = await Promise.all(
       usuariosIds.map(async (usuarioId) => {
@@ -214,7 +216,8 @@ export const obtenerConversaciones = async (req, res) => {
       })
     );
 
-    const conversacionesFiltradas = conversaciones.filter(c => c !== null)
+    const conversacionesFiltradas = conversaciones
+      .filter(c => c !== null)
       .sort((a, b) =>
         new Date(b.ultimoMensaje.createdAt) - new Date(a.ultimoMensaje.createdAt)
       );
@@ -234,7 +237,6 @@ export const obtenerConversaciones = async (req, res) => {
 
 export const marcarComoLeido = async (req, res) => {
   try {
-
     const { usuarioId } = req.params;
 
     await Mensaje.updateMany(
@@ -246,7 +248,7 @@ export const marcarComoLeido = async (req, res) => {
       { leido: true }
     );
 
-    // Notificar al emisor que sus mensajes han sido leídos
+    // Notificar al emisor
     const io = req.app.get('io');
     io.to(usuarioId).emit('mensajes:leidos', {
       receptorId: req.egresado._id.toString()
@@ -298,7 +300,7 @@ export const eliminarMensaje = async (req, res) => {
       await mensaje.save();
     }
 
-    // Notificar eliminación vía socket
+    // Notificar vía socket
     const io = req.app.get('io');
     const otroUsuarioId = mensaje.emisor.toString() === egresadoId
       ? mensaje.receptor.toString()

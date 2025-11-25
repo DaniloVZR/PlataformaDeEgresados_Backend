@@ -1,121 +1,105 @@
-import jwt from 'jsonwebtoken';
-import Usuario from '../models/Usuario.js';
-import Egresado from '../models/Egresado.js';
+import jwt from "jsonwebtoken";
+import Egresado from "../models/Egresado.js";
 
-const usuariosConectados = new Map();
+const usuariosConectados = new Map(); // egresadoId -> socketId
 
 export const configurarSocket = (io) => {
-
+  // Middleware de autenticación
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
 
       if (!token) {
-        return next(new Error('Autenticación requerida'));
+        return next(new Error('Token no proporcionado'));
       }
 
+      // Verificar token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      const usuario = await Usuario.findById(decoded.id).populate('-password -token');
-
-      if (!usuario || !usuario.confirmado || usuario.bloqueado) {
-        return next(new Error('Usuario no autorizado'));
-      }
-
-      const egresado = await Egresado.findOne({ usuario: usuario._id });
+      // Buscar egresado
+      const egresado = await Egresado.findOne({ usuario: decoded.id });
 
       if (!egresado) {
         return next(new Error('Egresado no encontrado'));
       }
 
-      socket.userId = usuario._id.toString();
+      // Agregar datos al socket
       socket.egresadoId = egresado._id.toString();
-      socket.nombre = egresado.nombre;
-      socket.apellido = egresado.apellido;
-      socket.fotoPerfil = egresado.fotoPerfil;
-      next();
+      socket.usuarioId = decoded.id;
 
+      next();
     } catch (error) {
-      console.error('Error en la autenticación del socket:', error);
-      next(new Error('Error en la autenticación del socket'));
+      console.error('Error en autenticación de socket:', error);
+      next(new Error('Autenticación fallida'));
     }
   });
 
+  // Conexión exitosa
   io.on('connection', (socket) => {
-    console.log(`Usuario conectado: ${socket.egresadoId}`);
+    const egresadoId = socket.egresadoId;
 
-    usuariosConectados.set(socket.egresadoId, socket.id);
+    // Registrar usuario conectado
+    usuariosConectados.set(egresadoId, socket.id);
 
-    socket.join(socket.egresadoId);
+    // Unir al room personal
+    socket.join(egresadoId);
 
-    socket.broadcast.emit('usuario-conectado', {
-      egresadoId: socket.egresadoId,
-      enLinea: true
-    });
+    // Notificar a todos que este usuario se conectó
+    socket.broadcast.emit('usuario:en-linea', { egresadoId });
 
-    socket.emit('usuarios:conectados', {
-      usuariosConectados: Array.from(usuariosConectados.keys())
-    });
+    // Enviar lista de usuarios conectados al nuevo usuario
+    const usuariosOnline = Array.from(usuariosConectados.keys());
+    socket.emit('usuarios:conectados', { usuariosConectados: usuariosOnline });
 
-    // Mensajes
+    // ==================== MENSAJES ====================
 
-    socket.on('mensaje:escribiendo', async ({ receptorId }) => {
+    // Usuario está escribiendo
+    socket.on('mensaje:escribiendo', ({ receptorId }) => {
       const receptorSocketId = usuariosConectados.get(receptorId);
       if (receptorSocketId) {
         io.to(receptorSocketId).emit('mensaje:escribiendo', {
-          emisorId: socket.egresadoId,
-          nombre: socket.nombre,
-          apellido: socket.apellido,
+          emisorId: egresadoId
         });
       }
     });
 
+    // Usuario dejó de escribir
     socket.on('mensaje:dejo-escribir', ({ receptorId }) => {
       const receptorSocketId = usuariosConectados.get(receptorId);
       if (receptorSocketId) {
         io.to(receptorSocketId).emit('mensaje:dejo-escribir', {
-          emisorId: socket.egresadoId
+          emisorId: egresadoId
         });
       }
     });
 
-    socket.on('mensaje:leido', ({ emisorId }) => {
-      const emisorSocketId = usuariosConectados.get(emisorId);
-      if (emisorSocketId) {
-        io.to(emisorSocketId).emit('mensaje:leido', {
-          receptorId: socket.egresadoId
-        });
-      }
+    // ==================== DESCONEXIÓN ====================
+
+    socket.on('disconnect', (reason) => {
+
+      // Eliminar de usuarios conectados
+      usuariosConectados.delete(egresadoId);
+
+      // Notificar a todos
+      socket.broadcast.emit('usuario:desconectado', { egresadoId });
     });
 
-    socket.on('disconnect', () => {
-      console.log(`❌ Usuario desconectado: ${socket.egresadoId}`);
+    // ==================== ERRORES ====================
 
-      // Remover de la lista de conectados
-      usuariosConectados.delete(socket.egresadoId);
-
-      // Notificar desconexión
-      socket.broadcast.emit('usuario:desconectado', {
-        egresadoId: socket.egresadoId,
-        enLinea: false
-      });
-    });
-
-    // Manejar errores
     socket.on('error', (error) => {
-      console.error('Error en socket:', error);
+      console.error('Error de socket:', error);
     });
   });
+
+  console.log('🚀 Socket.IO configurado correctamente');
 };
 
-export const emitirEvento = (io, evento, datos) => {
-  io.to(receptorId).emit(evento, datos);
-}
-
-export const obtenerUsuariosConectados = () => {
-  return Array.from(usuariosConectados.keys());
-}
-
-export const estaConectado = (egresadoId) => {
+// Helper para obtener usuario conectado
+export const getUsuarioConectado = (egresadoId) => {
   return usuariosConectados.has(egresadoId);
-}
+};
+
+// Helper para obtener todos los usuarios conectados
+export const getUsuariosConectados = () => {
+  return Array.from(usuariosConectados.keys());
+};
