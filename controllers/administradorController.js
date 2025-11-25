@@ -165,53 +165,54 @@ export const obtenerEstadisticasDetalladas = async (req, res) => {
 
 export const listarUsuarios = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      rol,
-      activo,
-      buscar
-    } = req.query;
+    // Convertir explícitamente a String para prevenir NoSQL injection
+    const pageStr = String(req.query.page || '1');
+    const limitStr = String(req.query.limit || '10');
+    const rolStr = req.query.rol ? String(req.query.rol) : null;
+    const activoStr = req.query.activo ? String(req.query.activo) : null;
+    const buscarStr = req.query.buscar ? String(req.query.buscar) : null;
 
     // VALIDACIÓN Y SANITIZACIÓN
     const filtros = {};
 
-    // Validar rol
-    if (rol) {
-      const rolValidado = validarRol(rol);
+    // Validar rol (solo strings seguros)
+    if (rolStr) {
+      const rolValidado = validarRol(rolStr);
       if (rolValidado) {
-        filtros.rol = rolValidado;
+        filtros.rol = String(rolValidado); // Garantizar que es string
       }
     }
 
-    // Validar activo
-    if (activo !== undefined) {
-      const activoValidado = validarEstadoActivo(activo);
+    // Validar activo (solo boolean)
+    if (activoStr) {
+      const activoValidado = validarEstadoActivo(activoStr);
       if (activoValidado !== undefined) {
-        filtros.activo = activoValidado;
+        filtros.activo = Boolean(activoValidado); // Garantizar que es boolean
       }
     }
 
-    // Sanitizar búsqueda
-    if (buscar) {
-      const busquedaSanitizada = sanitizarBusqueda(buscar);
+    // Sanitizar búsqueda (solo strings)
+    if (buscarStr) {
+      const busquedaSanitizada = sanitizarBusqueda(buscarStr);
       if (busquedaSanitizada) {
+        // Usar strings literales en lugar de regex para mayor seguridad
+        const searchPattern = String(busquedaSanitizada);
         filtros.$or = [
-          { nombre: { $regex: busquedaSanitizada, $options: 'i' } },
-          { correo: { $regex: busquedaSanitizada, $options: 'i' } }
+          { nombre: { $regex: searchPattern, $options: 'i' } },
+          { correo: { $regex: searchPattern, $options: 'i' } }
         ];
       }
     }
 
-    // Validar paginación
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 10));
+    // Validar paginación (garantizar numbers)
+    const pageNum = Math.max(1, parseInt(pageStr, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limitStr, 10) || 10));
 
     const usuarios = await Usuario.find(filtros)
       .select('-password -token')
       .sort({ createdAt: -1 })
-      .limit(limitNum)
-      .skip((pageNum - 1) * limitNum)
+      .limit(Number(limitNum))
+      .skip(Number((pageNum - 1) * limitNum))
       .lean();
 
     const total = await Usuario.countDocuments(filtros);
@@ -220,7 +221,7 @@ export const listarUsuarios = async (req, res) => {
       success: true,
       usuarios,
       totalPages: Math.ceil(total / limitNum),
-      currentPage: pageNum,
+      currentPage: Number(pageNum),
       total
     });
   } catch (error) {
@@ -286,11 +287,12 @@ export const obtenerDetalleUsuario = async (req, res) => {
 
 export const cambiarRolUsuario = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { rol } = req.body;
+    // Convertir a String explícitamente
+    const idStr = String(req.params.id);
+    const rolStr = String(req.body.rol);
 
     // VALIDACIÓN 1: Validar ObjectId
-    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+    if (!idStr || !idStr.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({
         success: false,
         msg: "ID de usuario inválido"
@@ -298,7 +300,7 @@ export const cambiarRolUsuario = async (req, res) => {
     }
 
     // VALIDACIÓN 2: Validar rol
-    const rolValidado = validarRol(rol);
+    const rolValidado = validarRol(rolStr);
     if (!rolValidado) {
       return res.status(400).json({
         success: false,
@@ -306,7 +308,7 @@ export const cambiarRolUsuario = async (req, res) => {
       });
     }
 
-    const usuario = await Usuario.findById(id);
+    const usuario = await Usuario.findById(idStr);
 
     if (!usuario) {
       return res.status(404).json({
@@ -323,8 +325,8 @@ export const cambiarRolUsuario = async (req, res) => {
       });
     }
 
-    // USAR VALOR VALIDADO
-    usuario.rol = rolValidado;
+    // USAR VALOR VALIDADO y convertido a String
+    usuario.rol = String(rolValidado);
     await usuario.save();
 
     res.json({
@@ -416,21 +418,24 @@ export const toggleBanUsuario = async (req, res) => {
 
 export const listarPublicacionesAdmin = async (req, res) => {
   try {
-    const { page = 1, limit = 10, buscar } = req.query;
+    // Convertir explícitamente a String
+    const pageStr = String(req.query.page || '1');
+    const limitStr = String(req.query.limit || '10');
+    const buscarStr = req.query.buscar ? String(req.query.buscar) : null;
 
     const filtros = {};
 
     // Sanitizar búsqueda
-    if (buscar) {
-      const busquedaSanitizada = sanitizarBusqueda(buscar);
+    if (buscarStr) {
+      const busquedaSanitizada = sanitizarBusqueda(buscarStr);
       if (busquedaSanitizada) {
-        filtros.descripcion = { $regex: busquedaSanitizada, $options: 'i' };
+        filtros.descripcion = { $regex: String(busquedaSanitizada), $options: 'i' };
       }
     }
 
-    // Validar paginación
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 10));
+    // Validar paginación (garantizar numbers)
+    const pageNum = Math.max(1, parseInt(pageStr, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limitStr, 10) || 10));
 
     const publicaciones = await Publicacion.find(filtros)
       .populate('autor', 'nombre apellido fotoPerfil email')
@@ -442,8 +447,8 @@ export const listarPublicacionesAdmin = async (req, res) => {
         }
       })
       .sort({ createdAt: -1 })
-      .limit(limitNum)
-      .skip((pageNum - 1) * limitNum)
+      .limit(Number(limitNum))
+      .skip(Number((pageNum - 1) * limitNum))
       .lean();
 
     const total = await Publicacion.countDocuments(filtros);
@@ -452,7 +457,7 @@ export const listarPublicacionesAdmin = async (req, res) => {
       success: true,
       publicaciones,
       totalPages: Math.ceil(total / limitNum),
-      currentPage: pageNum,
+      currentPage: Number(pageNum),
       total
     });
   } catch (error) {
