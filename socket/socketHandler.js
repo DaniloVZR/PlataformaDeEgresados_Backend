@@ -5,6 +5,7 @@ import Egresado from '../models/Egresado.js';
 const usuariosConectados = new Map();
 
 export const configurarSocket = (io) => {
+
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
