@@ -13,7 +13,7 @@ const checkEgresado = async (req, res, next) => {
     const egresado = await Egresado.findOne({ usuario: req.usuario._id });
 
     if (!egresado) {
-      egresado = new Egresado({
+      const egresado = new Egresado({
         usuario: req.usuario._id,
         nombre: req.usuario.nombre,
         email: req.usuario.correo,
