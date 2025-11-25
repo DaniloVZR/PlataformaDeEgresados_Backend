@@ -26,7 +26,7 @@ app.use(cookieParser());
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:5173'
-];
+].filter(Boolean);
 
 // Actualiza CORS para permitir credentials
 const corsOptions = {
@@ -60,11 +60,21 @@ const io = new Server(httpServer, {
     methods: ['GET', 'POST']
   },
   transports: ['websocket', 'polling'],
-  allowEIO3: true
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
+  maxHttpBufferSize: 1e8,
+  // Permitir upgrade de polling a websocket
+  allowUpgrades: true,
+  // Path específico
+  path: '/socket.io/',
+  // Configuración adicional para proxy
+  serveClient: false,
+  cookie: false
 });
 
 configurarSocket(io);
-
 app.set('io', io);
 
 app.get('/', (req, res) => {

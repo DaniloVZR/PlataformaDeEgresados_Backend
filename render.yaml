@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: plataformadeegresados-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /health
+    # IMPORTANTE: Configuración para WebSockets
+    autoDeploy: true
+    headers:
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"
+      - path: /socket.io/*
+        name: Connection
+        value: Upgrade
+      - path: /socket.io/*
+        name: Upgrade
+        value: websocket
